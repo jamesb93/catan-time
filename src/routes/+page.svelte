@@ -1,4 +1,20 @@
 <script>
+
+	import { getDatabase,set, ref, onValue } from "firebase/database";
+	import { initializeApp } from "firebase/app";
+
+	const firebaseConfig = {
+		apiKey: "AIzaSyDR-7wn0q0_OFrpQN2f8ciojC6n2t0N4Q4",
+		authDomain: "catan-time.firebaseapp.com",
+		databaseURL: "https://catan-time-default-rtdb.asia-southeast1.firebasedatabase.app",
+		projectId: "catan-time",
+		storageBucket: "catan-time.appspot.com",
+		messagingSenderId: "1076646348235",
+		appId: "1:1076646348235:web:616b643ecdb7825031e24e"
+	};
+	const app = initializeApp(firebaseConfig);
+	const database = getDatabase(app);
+
 	let roll = 0
 	let dice0 = 0;
 	let dice1 = 0;
@@ -11,24 +27,54 @@
 	// Four 32-bit component hashes provide the seed for sfc32.
 	const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
 
+	onValue(ref(database, 'roll'), (snapshot) => {
+		roll = snapshot.val();
+	});
+
+	onValue(ref(database, 'dice'), (snapshot) => {
+		try {
+			dice0 = snapshot.val().dice0;
+			dice1 = snapshot.val().dice1;
+		} catch (error) {
+			console.log(error)
+		}
+	});
+
+	onValue(ref(database, 'rollHistory'), (snapshot) => {
+		try {
+			const value = snapshot.val()
+			if (value.length > 0) {
+				rollHistory = snapshot.val();
+			}
+		} catch (error) {
+			console.log(error)
+		}
+	});
+
+	function writeRoll(rollAmount, dice0, dice1) {
+		const db = getDatabase();
+		set(ref(db, 'roll'), rollAmount);
+		set(ref(db, 'dice'), {
+			dice0: dice0,
+			dice1: dice1
+		});
+		set(ref(db, 'rollHistory'), rollHistory);
+	}
+
 	function rollDice() {
-		// change the random seed
-		// https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
-		// https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
-
-
-
 		dice0 = Math.floor(rand() * maxRoll) + 1
 		dice1 = Math.floor(rand() * maxRoll) + 1
 		roll = dice0 + dice1
 		rollHistory.push(roll)
 		rollHistory = rollHistory
 
+
 		if (rollHistory.length > 10) {
 			rollHistory.shift()
 		}
 
 		analysisStorage.push(roll)
+		writeRoll(roll, dice0, dice1)
 	}
 
 	function cyrb128(str) {
@@ -61,6 +107,8 @@
 		return (t >>> 0) / 4294967296;
 		}
 	}
+
+
 </script>
 
 <button on:click={rollDice}>
