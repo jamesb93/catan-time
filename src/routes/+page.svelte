@@ -61,7 +61,8 @@
 		set(ref(db, 'rollHistory'), rollHistory);
 	}
 
-	function rollDice() {
+	function rollDice(e) {
+		e.preventDefault()
 		dice0 = Math.floor(rand() * maxRoll) + 1
 		dice1 = Math.floor(rand() * maxRoll) + 1
 		roll = dice0 + dice1
@@ -111,24 +112,34 @@
 
 </script>
 
-<button on:click={rollDice}>
-	{roll}
-	<div class='dice-view'>
-		<div>{dice0}</div>
-		<div>{dice1}</div>
+<div class='container'>
+	<div class='roll-history'>
+		{#each rollHistory as rolls, i}
+		<div class='historic-roll'>
+			<div class:lastroll={i === rollHistory.length-1}>{`${i}: ${rolls}`}</div>
+		</div>
+		{/each}
 	</div>
-</button>
-<div class='dice-look'>
-</div>
-<div class='roll-history'>
-	{#each rollHistory as rolls}
-	<div class='historic-roll'>
-		{rolls}
-	</div>
-	{/each}
+	<button on:click={rollDice}>
+		{roll}
+		<div class='dice-view'>
+			<div>{dice0}</div>
+			<div>|</div>
+			<div>{dice1}</div>
+		</div>
+	</button>
 </div>
 
 <style>
+	.container {
+		display: grid;
+		grid-template-columns: 7em auto;
+		user-select: none;
+		-webkit-user-select: none;
+	}
+	.lastroll {
+		color: red;	
+	}
 	button {
 		font-size: 8em;
 		/* no border and flat look; */
@@ -140,19 +151,22 @@
 
 	.dice-view {
 		display: grid;
-		grid-template-columns: auto auto;
+		justify-content: center;
+		gap: 1.5em;
+		grid-template-columns: auto auto auto;
 		font-size: 0.5em;
 	}
 
 	.roll-history {
 		display: flex;
-		flex-direction: row;
-		flex-wrap: wrap;
-		justify-content: center;
-		align-items: center;
+		flex-direction: column;
+		flex-wrap: none;
+		justify-content: left;
 	}
 
 	.historic-roll {
+		display: flex;
+		flex-direction: row;
 		font-size: 2em;
 		margin: 0.5em;
 	}
