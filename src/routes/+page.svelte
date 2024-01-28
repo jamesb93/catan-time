@@ -116,7 +116,7 @@
 	<div class='roll-history'>
 		{#each rollHistory as rolls, i}
 		<div class='historic-roll'>
-			<div class:lastroll={i === rollHistory.length-1}>{`${i}: ${rolls}`}</div>
+			<div class:lastroll={i === rollHistory.length-1}>{rolls}</div>
 		</div>
 		{/each}
 	</div>
@@ -133,25 +133,24 @@
 <style>
 	.container {
 		display: grid;
-		grid-template-columns: 7em auto;
+		grid-template-columns: 4em auto;
 		user-select: none;
 		-webkit-user-select: none;
 	}
 	.lastroll {
-		color: red;	
+		color: red;
 	}
 	button {
-		font-size: 8em;
+		font-size: 4em;
 		/* no border and flat look; */
 		background: none;
-		width: 100%;
 		height: 100%;
 	}
 
 	.dice-view {
 		display: grid;
 		justify-content: center;
-		gap: 1em;
+		gap: 0.5em;
 		grid-template-columns: auto auto auto;
 		font-size: 0.5em;
 	}
@@ -166,7 +165,7 @@
 	.historic-roll {
 		display: flex;
 		flex-direction: row;
-		font-size: 2em;
+		font-size: 1em;
 		margin: 0.5em;
 	}
 </style>
