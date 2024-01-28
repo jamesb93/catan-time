@@ -146,13 +146,12 @@
 		background: none;
 		width: 100%;
 		height: 100%;
-		min-height: 80vh;
 	}
 
 	.dice-view {
 		display: grid;
 		justify-content: center;
-		gap: 1.5em;
+		gap: 1em;
 		grid-template-columns: auto auto auto;
 		font-size: 0.5em;
 	}
