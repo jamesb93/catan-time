@@ -5,8 +5,9 @@
 	import { cyrb128, sfc32 } from '$lib/rng'
 	import { writable } from 'svelte/store';
 	import { database } from '$lib/database';
+	import { browser } from '$app/environment';
 
-	let context;
+	const context = browser ? new AudioContext() : null;
 	let sevenAudioBuffer, diceAudioBuffer;
 	let shaking = false;
 
@@ -43,8 +44,6 @@
 	}
 
 	onMount(async() => {
-		context = new AudioContext();
-
         const response = await fetch('/seven.mp3');
         const arrayBuffer = await response.arrayBuffer();
         sevenAudioBuffer = await context.decodeAudioData(arrayBuffer);
@@ -52,11 +51,17 @@
 		const response2 = await fetch('/dice.mp3');
         const arrayBuffer2 = await response2.arrayBuffer();
         diceAudioBuffer = await context.decodeAudioData(arrayBuffer2);
+
+		window.addEventListener('mousedown', () => {
+			context.resume();
+		});
 	})
 
 	export const kGameStateUnknown = 0
 	export const kGameStateRolling = 1
 	export const kGameStateRolled = 2
+
+	const kRollingDuration = 1000;
 
 	export const gameState = writable(kGameStateUnknown)
 	export const theState = writable({
@@ -66,26 +71,32 @@
 		history: Array.from({length: 10}, () => 0),
 	})
 
-	export const audioCompensation = writable(0)
-
-	// Listeners
 	onValue(ref(database, 'state'), (snapshot) => {
-		const {timestamp} = snapshot.val();
-		const offset = timestamp - Date.now();
-		gameState.set(kGameStateRolling)
-		
-		if (offset > 0) {
-			audioCompensation.set(offset)
-		}
+		if (!browser) return;
 
-		const buffer = $gameState === kGameStateRolling ? diceAudioBuffer : whaa ? sevenAudioBuffer : null;
-		console.log($gameState, buffer)
-		if (buffer) {			
-			const node = context.createBufferSource();
-			node.buffer = buffer;
-			
-			node.connect(context.destination);
-			node.start(context.currentTime + $audioCompensation)
+		const {timestamp, dice0, dice1} = snapshot.val();
+		const offset = timestamp - Date.now();
+		const audioContextStartTime = Date.now() - (context.currentTime * 1000);
+
+		gameState.set(kGameStateRolling)
+
+		if (diceAudioBuffer) {
+			const rollingNode = context.createBufferSource();
+			rollingNode.buffer = diceAudioBuffer;
+			rollingNode.connect(context.destination);
+			const timeWhenRollingStarted = timestamp - kRollingDuration;
+			const audioContextTimeWhenRollingStarted = (timeWhenRollingStarted - audioContextStartTime) / 1000;
+			const differenceBetweenCurrentTimeAndStartTime = audioContextTimeWhenRollingStarted - context.currentTime;
+			const startTime = context.currentTime + Math.max(differenceBetweenCurrentTimeAndStartTime, 0);
+			const startTimeOffset = 0 - Math.min(0, differenceBetweenCurrentTimeAndStartTime);
+			rollingNode.start(startTime, startTimeOffset);
+		}
+		
+		if (offset > 0 && dice0 + dice1 === 7) {			
+			const whaaNode = context.createBufferSource();
+			whaaNode.buffer = sevenAudioBuffer;
+			whaaNode.connect(context.destination);
+			whaaNode.start(context.currentTime + (offset / 1000))
 		}
 
 		setTimeout(() => {
@@ -102,7 +113,7 @@
 			set(stateRef, {
 				dice0,
 				dice1,
-				timestamp: Date.now() + 1000,
+				timestamp: Date.now() + kRollingDuration,
 				history: [dice0 + dice1, ...history.slice(0, 9)],
 			})
 		});
