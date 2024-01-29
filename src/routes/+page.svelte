@@ -9,14 +9,11 @@
 
 	const context = browser ? new AudioContext() : null;
 	let sevenAudioBuffer, diceAudioBuffer;
-	let shaking = false;
 
 	$: totalRoll = $theState ? $theState.dice0 + $theState.dice1 : 0;
 	$: whaa = $gameState === kGameStateRolled && totalRoll === 7;
 
 	let maxRoll = 6
-	let rollHistory = Array.from({length: 10}, () => 0);
-	let analysisStorage = Array.from({length: 11}, () => 0);
 
 	function writeRoll(rollAmount, dice0, dice1) {
 		const db = getDatabase();
@@ -26,10 +23,6 @@
 			dice1: dice1
 		});
 		set(ref(db, 'rollHistory'), rollHistory);
-	}
-
-	function finishRoll() {
-		shaking = false;
 	}
 
 	function rollDice(e) {		
@@ -123,9 +116,9 @@
 <div class='container'>
 	{#if $gameState !== kGameStateUnknown}
 	<div class='roll-history'>
-		{#each rollHistory as rolls, i}
+		{#each $theState.history as rolls, i}
 		<div class='historic-roll'>
-			<div class:lastroll={i === rollHistory.length-1}>{rolls}</div>
+			<div class:lastroll={i === $theState.history.length-1}>{rolls}</div>
 		</div>
 		{/each}
 	</div>
