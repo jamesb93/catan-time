@@ -18,10 +18,12 @@
 	const app = initializeApp(firebaseConfig);
 	const database = getDatabase(app);
 
+	let loaded = false
+
 	let canvas, chart;
 	let shaking = false;
 	let whaa = false;
-	let sevenPlayer;
+	let sevenPlayer, dicePlayer;
 
 	let roll = 0
 	let dice0 = 0;
@@ -37,6 +39,7 @@
 	const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
 
 	onValue(ref(database, 'roll'), (snapshot) => {
+		loaded = true
 		roll = snapshot.val();
 	});
 
@@ -101,6 +104,8 @@
 		if (shaking) {
 			return
 		}
+	
+		dicePlayer.play()
 
 		shaking = true;
 		whaa = false;
@@ -186,6 +191,7 @@
 { analysisStorage } -->
 
 <div class='container'>
+	{#if loaded}
 	<div class='roll-history'>
 		{#each rollHistory as rolls, i}
 		<div class='historic-roll'>
@@ -201,11 +207,11 @@
 			<div>{dice1}</div>
 		</div>
 	</button>
+	{/if}
 </div>
 
-<audio src="/seven.mp3" preload='auto' bind:this={sevenPlayer}>
-
-</audio>
+<audio src="/seven.mp3" preload='auto' bind:this={sevenPlayer} />
+<audio src="/dice.mp3" preload='auto' bind:this={dicePlayer} />
 
 <style>
 	canvas {
