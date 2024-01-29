@@ -34,6 +34,7 @@
 
 	function rollDice(e) {		
 		e.preventDefault()
+		if ($gameState === kGameStateRolling) return;
 
 		const seed = cyrb128(Date.now().toString());
 		const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
@@ -130,7 +131,7 @@
 		</div>
 		{/each}
 	</div>
-	<button on:click={rollDice} class:roll-button-shaking={$gameState === kGameStateRolling} class:roll-button-whaa={whaa} class='roll-button'>
+	<button on:click={rollDice} disabled={$gameState === kGameStateRolling} class:roll-button-shaking={$gameState === kGameStateRolling} class:roll-button-whaa={whaa} class='roll-button'>
 		{$gameState === kGameStateRolled ? $theState.dice0 + $theState.dice1 : "???"}
 		<div class='dice-view'>
 			<div>{$gameState === kGameStateRolled ? $theState.dice0 : "?"}</div>
