@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel&display=swap');
+
+:root {
+	--maize: #FEF48Aff;
+	--persian-red: #C33E37ff;
+	--auburn: #A22A36ff;
+	--field-drab: #644F2Bff;
+	--seal-brown: #58301Eff;
+}
+
+html, button {
+	font-family: 'Cinzel', serif;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	width: 100%;
+	height: 100%;
+	padding: 0;
+	margin: 0;
+}
+
+
+
+body {
+	background: var(--persian-red)
+}
+
+button {
+	background-color: var(--maize);
+	border: var(--field-drab) 5px solid;
+	color: var(--seal-brown);
+	font-size: 4em;
+}
+
+button:active {
+	background-color: var(--auburn);
+	border: var(--maize) 5px solid;
+	color: var(--seal-brown);
+	font-size: 4em;
+}

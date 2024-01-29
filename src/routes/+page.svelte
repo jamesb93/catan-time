@@ -2,6 +2,9 @@
 
 	import { getDatabase,set, ref, onValue } from "firebase/database";
 	import { initializeApp } from "firebase/app";
+	import { onMount } from 'svelte';
+	import { Chart } from 'chart.js/auto';
+	import { cyrb128, sfc32 } from '$lib/rng'
 
 	const firebaseConfig = {
 		apiKey: "AIzaSyDR-7wn0q0_OFrpQN2f8ciojC6n2t0N4Q4",
@@ -15,13 +18,19 @@
 	const app = initializeApp(firebaseConfig);
 	const database = getDatabase(app);
 
+	let canvas, chart;
+	let shaking = false;
+	let whaa = false;
+	let sevenPlayer;
+
 	let roll = 0
 	let dice0 = 0;
 	let dice1 = 0;
 	let maxRoll = 6
 
-	let rollHistory = [];
-	let analysisStorage = [];
+	let rollHistory = Array.from({length: 10}, () => 0);
+	let analysisStorage = Array.from({length: 11}, () => 0);
+
 	// Create cyrb128 state:
 	const seed = cyrb128(Date.now().toString());
 	// Four 32-bit component hashes provide the seed for sfc32.
@@ -61,13 +70,22 @@
 		set(ref(db, 'rollHistory'), rollHistory);
 	}
 
-	function rollDice(e) {
-		e.preventDefault()
+	function finishRoll() {
+		shaking = false;
+
 		dice0 = Math.floor(rand() * maxRoll) + 1
 		dice1 = Math.floor(rand() * maxRoll) + 1
 		roll = dice0 + dice1
 		rollHistory.push(roll)
 		rollHistory = rollHistory
+
+		if (roll === 7) {
+			sevenPlayer.play()
+			whaa = true
+			setTimeout(() => {
+				whaa = false
+			}, 1500)
+		}
 
 
 		if (rollHistory.length > 10) {
@@ -78,39 +96,94 @@
 		writeRoll(roll, dice0, dice1)
 	}
 
-	function cyrb128(str) {
-		let h1 = 1779033703, h2 = 3144134277,
-			h3 = 1013904242, h4 = 2773480762;
-		for (let i = 0, k; i < str.length; i++) {
-			k = str.charCodeAt(i);
-			h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
-			h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
-			h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
-			h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+	function rollDice(e) {
+		e.preventDefault()
+		if (shaking) {
+			return
 		}
-		h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
-		h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
-		h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
-		h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
-		h1 ^= (h2 ^ h3 ^ h4), h2 ^= h1, h3 ^= h1, h4 ^= h1;
-		return [h1>>>0, h2>>>0, h3>>>0, h4>>>0];
-	}
 
-	function sfc32(a, b, c, d) {
-		return function() {
-		a |= 0; b |= 0; c |= 0; d |= 0; 
-		var t = (a + b | 0) + d | 0;
-		d = d + 1 | 0;
-		a = b ^ b >>> 9;
-		b = c + (c << 3) | 0;
-		c = (c << 21 | c >>> 11);
-		c = c + t | 0;
-		return (t >>> 0) / 4294967296;
-		}
+		shaking = true;
+		whaa = false;
+		roll = "???";
+		dice0 = "?";
+		dice1 = "?";
+		setTimeout(() => {
+			finishRoll()
+		}, 1000)
 	}
 
 
+	onMount(async() => {
+		chart = new Chart(canvas, {
+			type: 'bar',
+			data: {
+				labels: analysisStorage.map((x, i) => i + 2),
+				datasets: [{
+					label: 'Rolls',
+					backgroundColor: [
+						'rgba(255, 99, 132, 0.2)',
+						'rgba(255, 159, 64, 0.2)',
+						'rgba(255, 205, 86, 0.2)',
+						'rgba(75, 192, 192, 0.2)',
+						'rgba(54, 162, 235, 0.2)',
+						'rgba(153, 102, 255, 0.2)',
+						'rgba(201, 203, 207, 0.2)'
+						],
+						borderColor: [
+						'rgb(255, 99, 132)',
+						'rgb(255, 159, 64)',
+						'rgb(255, 205, 86)',
+						'rgb(75, 192, 192)',
+						'rgb(54, 162, 235)',
+						'rgb(153, 102, 255)',
+						'rgb(201, 203, 207)'
+					],
+					data: analysisStorage,
+					borderWidth: 1
+				}]
+			},
+			options: {
+				maintainAspectRatio: false,
+				scales: {
+					y: {
+						beginAtZero: true
+					},
+				},
+				responsive: true,
+				plugins: {
+					legend: {
+						// position: 'top',
+					},
+					title: {
+						display: true,
+						text: 'Chart.js Bar Chart'
+					}
+				}
+			},
+		})
+	})
+
+	function megaroll() {
+		const seed = cyrb128(Date.now().toString());
+	// Four 32-bit component hashes provide the seed for sfc32.
+		const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
+		for (var i=0; i < 100; i++) {
+			const dice0 = Math.floor(rand() * maxRoll) + 1
+			const dice1 = Math.floor(rand() * maxRoll) + 1
+			let sum = dice0 + dice1
+			let index = sum - 2 // offset by 2
+			analysisStorage[index] += 1	
+		}
+		chart.data.datasets[0].data = analysisStorage
+		chart.update()
+	}
 </script>
+
+<!-- <button on:click={megaroll}>GOGOGOGOGO</button>
+
+<canvas bind:this={canvas}></canvas>
+
+{ analysisStorage } -->
 
 <div class='container'>
 	<div class='roll-history'>
@@ -120,7 +193,7 @@
 		</div>
 		{/each}
 	</div>
-	<button on:click={rollDice}>
+	<button on:click={rollDice} class:roll-button-shaking={shaking} class:roll-button-whaa={whaa} class='roll-button'>
 		{roll}
 		<div class='dice-view'>
 			<div>{dice0}</div>
@@ -130,21 +203,77 @@
 	</button>
 </div>
 
+<audio src="/seven.mp3" preload='auto' bind:this={sevenPlayer}>
+
+</audio>
+
 <style>
+	canvas {
+		width: 400px;
+		height: 400px;
+		min-width: 400px;
+		min-height: 400px;
+	}
 	.container {
-		display: grid;
-		grid-template-columns: 4em auto;
+		padding: 0.5em;
+		display: flex;
+		flex-direction: column;
 		user-select: none;
 		-webkit-user-select: none;
+		height: 100%;
 	}
 	.lastroll {
-		color: red;
+		color: var(--maize);
 	}
-	button {
-		font-size: 4em;
-		/* no border and flat look; */
-		background: none;
+
+	@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+@keyframes whaa {
+0% { transform: scale(50%); }
+100% { transform: scale(100%);  }
+}
+
+	.roll-button-shaking {
+		animation: shake 0.5s;
+		animation-iteration-count: infinite;
+	}
+
+.roll-button-whaa {
+	animation: whaa 0.15s;
+	animation-iteration-count: infinite;
+}
+
+	.roll-button {
+		box-sizing: border-box;
 		height: 100%;
+		
+	}
+
+	.roll-history {
+		display: flex;
+		flex-direction: row-reverse;
+		flex-wrap: none;
+		justify-content: space-between;
+		color: var(--field-drab)
+	}
+
+	.historic-roll {
+		display: flex;
+		flex-direction: row;
+		font-size: 1em;
+		margin: 0.5em;
 	}
 
 	.dice-view {
@@ -153,19 +282,5 @@
 		gap: 0.5em;
 		grid-template-columns: auto auto auto;
 		font-size: 0.5em;
-	}
-
-	.roll-history {
-		display: flex;
-		flex-direction: column;
-		flex-wrap: none;
-		justify-content: left;
-	}
-
-	.historic-roll {
-		display: flex;
-		flex-direction: row;
-		font-size: 1em;
-		margin: 0.5em;
 	}
 </style>
