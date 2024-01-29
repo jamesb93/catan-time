@@ -52,11 +52,9 @@
 		const response2 = await fetch('/dice.mp3');
         const arrayBuffer2 = await response2.arrayBuffer();
         diceAudioBuffer = await context.decodeAudioData(arrayBuffer2);
-
-		window.addEventListener('mousedown', () => {
-			context.resume();
-		});
 	})
+
+
 
 	export const kGameStateUnknown = 0
 	export const kGameStateRolling = 1
@@ -141,6 +139,10 @@
 	</button>
 	{/if}
 </div>
+
+<svelte:window on:mousedown={() => {
+	context.resume();
+}}/>
 
 
 <style>
