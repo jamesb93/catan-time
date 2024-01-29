@@ -8,7 +8,8 @@
 	import { browser } from '$app/environment';
 
 	const context = browser ? new AudioContext() : null;
-	let sevenAudioBuffer, diceAudioBuffer;
+	let surpriseSounds = []
+	let diceSounds = []
 
 	$: totalRoll = $theState ? $theState.dice0 + $theState.dice1 : 0;
 	$: whaa = $gameState === kGameStateRolled && totalRoll === 7;
@@ -38,16 +39,24 @@
 	}
 
 	onMount(async() => {
-        const response = await fetch('/seven.mp3');
-        const arrayBuffer = await response.arrayBuffer();
-        sevenAudioBuffer = await context.decodeAudioData(arrayBuffer);
+		for (var i=0; i < 3; i++) {
+			fetch(`/dice${i}.mp3`)
+			.then(response => response.arrayBuffer())
+			.then(arrayBuffer => context.decodeAudioData(arrayBuffer))
+			.then(audioBuffer => {
+				diceSounds.push(audioBuffer);
+			})
+		}
 
-		const response2 = await fetch('/dice.mp3');
-        const arrayBuffer2 = await response2.arrayBuffer();
-        diceAudioBuffer = await context.decodeAudioData(arrayBuffer2);
+		['/gasp.mp3', '/mgs.mp3'].forEach((url) => {
+			fetch(url)
+			.then(response => response.arrayBuffer())
+			.then(arrayBuffer => context.decodeAudioData(arrayBuffer))
+			.then(audioBuffer => {
+				surpriseSounds.push(audioBuffer);
+			})
+		})
 	})
-
-
 
 	export const kGameStateUnknown = 0
 	export const kGameStateRolling = 1
@@ -72,9 +81,10 @@
 
 		gameState.set(kGameStateRolling)
 
-		if (diceAudioBuffer) {
+		if (diceSounds.length > 0) {
 			const rollingNode = context.createBufferSource();
-			rollingNode.buffer = diceAudioBuffer;
+			rollingNode.buffer = diceSounds[Math.floor(Math.random() * diceSounds.length)]
+			console.log(rollingNode.buffer)
 			rollingNode.connect(context.destination);
 			const timeWhenRollingStarted = timestamp - kRollingDuration;
 			const audioContextTimeWhenRollingStarted = (timeWhenRollingStarted - audioContextStartTime) / 1000;
@@ -86,7 +96,7 @@
 		
 		if (offset > 0 && dice0 + dice1 === 7) {			
 			const whaaNode = context.createBufferSource();
-			whaaNode.buffer = sevenAudioBuffer;
+			whaaNode.buffer = surpriseSounds[Math.floor(Math.random() * surpriseSounds.length)];
 			whaaNode.connect(context.destination);
 			whaaNode.start(context.currentTime + (offset / 1000))
 		}
@@ -118,7 +128,7 @@
 	<div class='roll-history'>
 		{#each $theState.history as rolls, i}
 		<div class='historic-roll'>
-			<div class:lastroll={i === $theState.history.length-1}>{rolls}</div>
+			<div class:lastroll={i === 0}>{rolls}</div>
 		</div>
 		{/each}
 	</div>
@@ -147,9 +157,6 @@
 		-webkit-user-select: none;
 		height: 100%;
 	}
-	.lastroll {
-		color: var(--maize);
-	}
 
 	@keyframes shake {
 		0% { transform: translate(1px, 1px) rotate(0deg); }
@@ -175,10 +182,10 @@
 		animation-iteration-count: infinite;
 	}
 
-.roll-button-whaa {
-	animation: whaa 0.15s;
-	animation-iteration-count: 9;
-}
+	.roll-button-whaa {
+		animation: whaa 0.15s;
+		animation-iteration-count: 9;
+	}
 
 	.roll-button {
 		box-sizing: border-box;
@@ -188,7 +195,7 @@
 
 	.roll-history {
 		display: flex;
-		flex-direction: row-reverse;
+		flex-direction: row;
 		flex-wrap: none;
 		justify-content: space-between;
 		color: var(--field-drab)
@@ -199,6 +206,12 @@
 		flex-direction: row;
 		font-size: 1em;
 		margin: 0.5em;
+		color: var(--maize);
+	}
+
+	.lastroll {
+		text-decoration: underline;
+		font-style: italic;
 	}
 
 	.dice-view {
