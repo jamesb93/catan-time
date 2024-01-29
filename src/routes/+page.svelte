@@ -1,67 +1,21 @@
 <script>
 
-	import { getDatabase,set, ref, onValue } from "firebase/database";
-	import { initializeApp } from "firebase/app";
+	import { getDatabase,set, ref, onValue, get } from "firebase/database";
 	import { onMount } from 'svelte';
-	import { Chart } from 'chart.js/auto';
 	import { cyrb128, sfc32 } from '$lib/rng'
+	import { writable } from 'svelte/store';
+	import { database } from '$lib/database';
 
-	const firebaseConfig = {
-		apiKey: "AIzaSyDR-7wn0q0_OFrpQN2f8ciojC6n2t0N4Q4",
-		authDomain: "catan-time.firebaseapp.com",
-		databaseURL: "https://catan-time-default-rtdb.asia-southeast1.firebasedatabase.app",
-		projectId: "catan-time",
-		storageBucket: "catan-time.appspot.com",
-		messagingSenderId: "1076646348235",
-		appId: "1:1076646348235:web:616b643ecdb7825031e24e"
-	};
-	const app = initializeApp(firebaseConfig);
-	const database = getDatabase(app);
-
-	let loaded = false
-
-	let canvas, chart;
+	let context;
+	let sevenAudioBuffer, diceAudioBuffer;
 	let shaking = false;
-	let whaa = false;
-	let sevenPlayer, dicePlayer;
 
-	let roll = 0
-	let dice0 = 0;
-	let dice1 = 0;
+	$: totalRoll = $theState ? $theState.dice0 + $theState.dice1 : 0;
+	$: whaa = $gameState === kGameStateRolled && totalRoll === 7;
+
 	let maxRoll = 6
-
 	let rollHistory = Array.from({length: 10}, () => 0);
 	let analysisStorage = Array.from({length: 11}, () => 0);
-
-	// Create cyrb128 state:
-	const seed = cyrb128(Date.now().toString());
-	// Four 32-bit component hashes provide the seed for sfc32.
-	const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
-
-	onValue(ref(database, 'roll'), (snapshot) => {
-		loaded = true
-		roll = snapshot.val();
-	});
-
-	onValue(ref(database, 'dice'), (snapshot) => {
-		try {
-			dice0 = snapshot.val().dice0;
-			dice1 = snapshot.val().dice1;
-		} catch (error) {
-			console.log(error)
-		}
-	});
-
-	onValue(ref(database, 'rollHistory'), (snapshot) => {
-		try {
-			const value = snapshot.val()
-			if (value.length > 0) {
-				rollHistory = snapshot.val();
-			}
-		} catch (error) {
-			console.log(error)
-		}
-	});
 
 	function writeRoll(rollAmount, dice0, dice1) {
 		const db = getDatabase();
@@ -75,123 +29,89 @@
 
 	function finishRoll() {
 		shaking = false;
-
-		dice0 = Math.floor(rand() * maxRoll) + 1
-		dice1 = Math.floor(rand() * maxRoll) + 1
-		roll = dice0 + dice1
-		rollHistory.push(roll)
-		rollHistory = rollHistory
-
-		if (roll === 7) {
-			sevenPlayer.play()
-			whaa = true
-			setTimeout(() => {
-				whaa = false
-			}, 1500)
-		}
-
-
-		if (rollHistory.length > 10) {
-			rollHistory.shift()
-		}
-
-		analysisStorage.push(roll)
-		writeRoll(roll, dice0, dice1)
 	}
 
-	function rollDice(e) {
+	function rollDice(e) {		
 		e.preventDefault()
-		if (shaking) {
-			return
-		}
-	
-		dicePlayer.play()
 
-		shaking = true;
-		whaa = false;
-		roll = "???";
-		dice0 = "?";
-		dice1 = "?";
-		setTimeout(() => {
-			finishRoll()
-		}, 1000)
+		const seed = cyrb128(Date.now().toString());
+		const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
+		const dice0 = Math.floor(rand() * maxRoll) + 1
+		const dice1 = Math.floor(rand() * maxRoll) + 1
+
+		setRoll(dice0, dice1);
 	}
-
 
 	onMount(async() => {
-		chart = new Chart(canvas, {
-			type: 'bar',
-			data: {
-				labels: analysisStorage.map((x, i) => i + 2),
-				datasets: [{
-					label: 'Rolls',
-					backgroundColor: [
-						'rgba(255, 99, 132, 0.2)',
-						'rgba(255, 159, 64, 0.2)',
-						'rgba(255, 205, 86, 0.2)',
-						'rgba(75, 192, 192, 0.2)',
-						'rgba(54, 162, 235, 0.2)',
-						'rgba(153, 102, 255, 0.2)',
-						'rgba(201, 203, 207, 0.2)'
-						],
-						borderColor: [
-						'rgb(255, 99, 132)',
-						'rgb(255, 159, 64)',
-						'rgb(255, 205, 86)',
-						'rgb(75, 192, 192)',
-						'rgb(54, 162, 235)',
-						'rgb(153, 102, 255)',
-						'rgb(201, 203, 207)'
-					],
-					data: analysisStorage,
-					borderWidth: 1
-				}]
-			},
-			options: {
-				maintainAspectRatio: false,
-				scales: {
-					y: {
-						beginAtZero: true
-					},
-				},
-				responsive: true,
-				plugins: {
-					legend: {
-						// position: 'top',
-					},
-					title: {
-						display: true,
-						text: 'Chart.js Bar Chart'
-					}
-				}
-			},
-		})
+		context = new AudioContext();
+
+        const response = await fetch('/seven.mp3');
+        const arrayBuffer = await response.arrayBuffer();
+        sevenAudioBuffer = await context.decodeAudioData(arrayBuffer);
+
+		const response2 = await fetch('/dice.mp3');
+        const arrayBuffer2 = await response2.arrayBuffer();
+        diceAudioBuffer = await context.decodeAudioData(arrayBuffer2);
 	})
 
-	function megaroll() {
-		const seed = cyrb128(Date.now().toString());
-	// Four 32-bit component hashes provide the seed for sfc32.
-		const rand = sfc32(seed[0], seed[1], seed[2], seed[3]);
-		for (var i=0; i < 100; i++) {
-			const dice0 = Math.floor(rand() * maxRoll) + 1
-			const dice1 = Math.floor(rand() * maxRoll) + 1
-			let sum = dice0 + dice1
-			let index = sum - 2 // offset by 2
-			analysisStorage[index] += 1	
+	export const kGameStateUnknown = 0
+	export const kGameStateRolling = 1
+	export const kGameStateRolled = 2
+
+	export const gameState = writable(kGameStateUnknown)
+	export const theState = writable({
+		dice0: 0,
+		dice1: 0,
+		timestamp: 0,
+		history: Array.from({length: 10}, () => 0),
+	})
+
+	export const audioCompensation = writable(0)
+
+	// Listeners
+	onValue(ref(database, 'state'), (snapshot) => {
+		const {timestamp} = snapshot.val();
+		const offset = timestamp - Date.now();
+		gameState.set(kGameStateRolling)
+		
+		if (offset > 0) {
+			audioCompensation.set(offset)
 		}
-		chart.data.datasets[0].data = analysisStorage
-		chart.update()
+
+		const buffer = $gameState === kGameStateRolling ? diceAudioBuffer : whaa ? sevenAudioBuffer : null;
+		console.log($gameState, buffer)
+		if (buffer) {			
+			const node = context.createBufferSource();
+			node.buffer = buffer;
+			
+			node.connect(context.destination);
+			node.start(context.currentTime + $audioCompensation)
+		}
+
+		setTimeout(() => {
+			theState.set(snapshot.val())
+			gameState.set(kGameStateRolled)
+		}, offset);
+	});
+
+	export function setRoll(dice0, dice1) {
+		gameState.set(kGameStateRolling)
+		const stateRef = ref(database, 'state');
+		get(stateRef).then((snapshot) => {
+			const {history} = snapshot.val();
+			set(stateRef, {
+				dice0,
+				dice1,
+				timestamp: Date.now() + 1000,
+				history: [dice0 + dice1, ...history.slice(0, 9)],
+			})
+		});
 	}
+
 </script>
 
-<!-- <button on:click={megaroll}>GOGOGOGOGO</button>
-
-<canvas bind:this={canvas}></canvas>
-
-{ analysisStorage } -->
-
 <div class='container'>
-	{#if loaded}
+	{#if $gameState !== kGameStateUnknown}
 	<div class='roll-history'>
 		{#each rollHistory as rolls, i}
 		<div class='historic-roll'>
@@ -199,27 +119,19 @@
 		</div>
 		{/each}
 	</div>
-	<button on:click={rollDice} class:roll-button-shaking={shaking} class:roll-button-whaa={whaa} class='roll-button'>
-		{roll}
+	<button on:click={rollDice} class:roll-button-shaking={$gameState === kGameStateRolling} class:roll-button-whaa={whaa} class='roll-button'>
+		{$gameState === kGameStateRolled ? $theState.dice0 + $theState.dice1 : "???"}
 		<div class='dice-view'>
-			<div>{dice0}</div>
+			<div>{$gameState === kGameStateRolled ? $theState.dice0 : "?"}</div>
 			<div>|</div>
-			<div>{dice1}</div>
+			<div>{$gameState === kGameStateRolled ? $theState.dice1 : "?"}</div>
 		</div>
 	</button>
 	{/if}
 </div>
 
-<audio src="/seven.mp3" preload='auto' bind:this={sevenPlayer} />
-<audio src="/dice.mp3" preload='auto' bind:this={dicePlayer} />
 
 <style>
-	canvas {
-		width: 400px;
-		height: 400px;
-		min-width: 400px;
-		min-height: 400px;
-	}
 	.container {
 		padding: 0.5em;
 		display: flex;
@@ -233,23 +145,23 @@
 	}
 
 	@keyframes shake {
-  0% { transform: translate(1px, 1px) rotate(0deg); }
-  10% { transform: translate(-1px, -2px) rotate(-1deg); }
-  20% { transform: translate(-3px, 0px) rotate(1deg); }
-  30% { transform: translate(3px, 2px) rotate(0deg); }
-  40% { transform: translate(1px, -1px) rotate(1deg); }
-  50% { transform: translate(-1px, 2px) rotate(-1deg); }
-  60% { transform: translate(-3px, 1px) rotate(0deg); }
-  70% { transform: translate(3px, 1px) rotate(-1deg); }
-  80% { transform: translate(-1px, -1px) rotate(1deg); }
-  90% { transform: translate(1px, 2px) rotate(0deg); }
-  100% { transform: translate(1px, -2px) rotate(-1deg); }
-}
+		0% { transform: translate(1px, 1px) rotate(0deg); }
+		10% { transform: translate(-1px, -2px) rotate(-1deg); }
+		20% { transform: translate(-3px, 0px) rotate(1deg); }
+		30% { transform: translate(3px, 2px) rotate(0deg); }
+		40% { transform: translate(1px, -1px) rotate(1deg); }
+		50% { transform: translate(-1px, 2px) rotate(-1deg); }
+		60% { transform: translate(-3px, 1px) rotate(0deg); }
+		70% { transform: translate(3px, 1px) rotate(-1deg); }
+		80% { transform: translate(-1px, -1px) rotate(1deg); }
+		90% { transform: translate(1px, 2px) rotate(0deg); }
+		100% { transform: translate(1px, -2px) rotate(-1deg); }
+	}
 
-@keyframes whaa {
-0% { transform: scale(50%); }
-100% { transform: scale(100%);  }
-}
+	@keyframes whaa {
+		0% { transform: scale(50%); }
+		100% { transform: scale(100%);  }
+	}
 
 	.roll-button-shaking {
 		animation: shake 0.5s;
@@ -258,7 +170,7 @@
 
 .roll-button-whaa {
 	animation: whaa 0.15s;
-	animation-iteration-count: infinite;
+	animation-iteration-count: 9;
 }
 
 	.roll-button {
